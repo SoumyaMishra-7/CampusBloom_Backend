@@ -108,7 +108,7 @@ class BackendApplicationTests {
         String loginPayload = """
                 {
                   "role": "student",
-                  "identifier": "CSE101",
+                  "email": "aarav@example.com",
                   "captchaId": "%s",
                   "captchaAnswer": "%s",
                   "password": "password123"
@@ -125,6 +125,30 @@ class BackendApplicationTests {
         assertThat(loginResponse.getBody()).isNotNull();
         assertThat(loginResponse.getBody().role()).isEqualTo("student");
         assertThat(loginResponse.getBody().redirectTo()).isEqualTo("/student-dashboard");
+    }
+
+    @Test
+    void adminCanRegister() {
+        String registerPayload = """
+                {
+                  "fullName": "Nisha Rao",
+                  "email": "nisha@example.com",
+                  "institutionName": "Campus Bloom University",
+                  "adminId": "ADMIN001",
+                  "password": "password123",
+                  "confirmPassword": "password123"
+                }
+                """;
+
+        ResponseEntity<ActionResponse> registerResponse = restTemplate.postForEntity(
+                "http://localhost:" + port + "/api/auth/register/admin",
+                jsonRequest(registerPayload),
+                ActionResponse.class
+        );
+
+        assertThat(registerResponse.getStatusCode().is2xxSuccessful()).isTrue();
+        assertThat(registerResponse.getBody()).isNotNull();
+        assertThat(registerResponse.getBody().message()).isEqualTo("Admin account created successfully");
     }
 
     @Test
@@ -150,7 +174,7 @@ class BackendApplicationTests {
         String loginPayload = """
                 {
                   "role": "admin",
-                  "identifier": "ADMIN001",
+                  "email": "nisha@example.com",
                   "captchaId": "%s",
                   "captchaAnswer": "%s",
                   "password": "wrong-password"
@@ -166,7 +190,7 @@ class BackendApplicationTests {
 
         assertThat(loginResponse.getStatusCode().is4xxClientError()).isTrue();
         assertThat(loginResponse.getBody()).isNotNull();
-        assertThat(loginResponse.getBody().message()).isEqualTo("Invalid email/identifier or password");
+        assertThat(loginResponse.getBody().message()).isEqualTo("Invalid email or password");
     }
 
     @Test
@@ -192,7 +216,7 @@ class BackendApplicationTests {
         String loginPayload = """
                 {
                   "role": "student",
-                  "identifier": "CSE102",
+                  "email": "ishita@example.com",
                   "captchaId": "%s",
                   "captchaAnswer": "9999",
                   "password": "password123"
@@ -209,5 +233,131 @@ class BackendApplicationTests {
         assertThat(loginResponse.getStatusCode().is4xxClientError()).isTrue();
         assertThat(loginResponse.getBody()).isNotNull();
         assertThat(loginResponse.getBody().message()).isEqualTo("Incorrect captcha answer");
+    }
+
+    @Test
+    void adminCanLoginWithoutAdminId() {
+        String registerPayload = """
+                {
+                  "fullName": "Riya Kapoor",
+                  "email": "riya.admin@example.com",
+                  "institutionName": "Campus Bloom University",
+                  "adminId": "ADMIN777",
+                  "password": "password123",
+                  "confirmPassword": "password123"
+                }
+                """;
+
+        restTemplate.postForEntity(
+                "http://localhost:" + port + "/api/auth/register/admin",
+                jsonRequest(registerPayload),
+                ActionResponse.class
+        );
+
+        CaptchaChallengeResponse captcha = fetchCaptcha();
+        String loginPayload = """
+                {
+                  "role": "admin",
+                  "email": "riya.admin@example.com",
+                  "captchaId": "%s",
+                  "captchaAnswer": "%s",
+                  "password": "password123"
+                }
+                """.formatted(captcha.captchaId(), solveCaptcha(captcha.prompt()));
+
+        ResponseEntity<AuthResponse> loginResponse = restTemplate.postForEntity(
+                "http://localhost:" + port + "/api/auth/login",
+                jsonRequest(loginPayload),
+                AuthResponse.class
+        );
+
+        assertThat(loginResponse.getStatusCode().is2xxSuccessful()).isTrue();
+        assertThat(loginResponse.getBody()).isNotNull();
+        assertThat(loginResponse.getBody().role()).isEqualTo("admin");
+        assertThat(loginResponse.getBody().redirectTo()).isEqualTo("/admin-dashboard");
+    }
+
+    @Test
+    void studentRegistrationRejectsDuplicateRollNumber() {
+        String registerPayload = """
+                {
+                  "fullName": "Aarav Sharma",
+                  "email": "aarav.one@example.com",
+                  "rollNumber": "CSE999",
+                  "department": "Computer Science",
+                  "password": "password123",
+                  "confirmPassword": "password123"
+                }
+                """;
+
+        restTemplate.postForEntity(
+                "http://localhost:" + port + "/api/auth/register/student",
+                jsonRequest(registerPayload),
+                ActionResponse.class
+        );
+
+        String duplicatePayload = """
+                {
+                  "fullName": "Aarav Sharma Two",
+                  "email": "aarav.two@example.com",
+                  "rollNumber": "CSE999",
+                  "department": "Computer Science",
+                  "password": "password123",
+                  "confirmPassword": "password123"
+                }
+                """;
+
+        ResponseEntity<ActionResponse> duplicateResponse = restTemplate.exchange(
+                "http://localhost:" + port + "/api/auth/register/student",
+                HttpMethod.POST,
+                jsonRequest(duplicatePayload),
+                ActionResponse.class
+        );
+
+        assertThat(duplicateResponse.getStatusCode().is4xxClientError()).isTrue();
+        assertThat(duplicateResponse.getBody()).isNotNull();
+        assertThat(duplicateResponse.getBody().message()).isEqualTo("An account with this roll number already exists");
+    }
+
+    @Test
+    void adminRegistrationRejectsDuplicateAdminId() {
+        String registerPayload = """
+                {
+                  "fullName": "Admin One",
+                  "email": "admin.one@example.com",
+                  "institutionName": "Campus Bloom University",
+                  "adminId": "ADMIN900",
+                  "password": "password123",
+                  "confirmPassword": "password123"
+                }
+                """;
+
+        restTemplate.postForEntity(
+                "http://localhost:" + port + "/api/auth/register/admin",
+                jsonRequest(registerPayload),
+                ActionResponse.class
+        );
+
+        String duplicatePayload = """
+                {
+                  "fullName": "Admin Two",
+                  "email": "admin.two@example.com",
+                  "institutionName": "Campus Bloom University",
+                  "adminId": "ADMIN900",
+                  "password": "password123",
+                  "confirmPassword": "password123"
+                }
+                """;
+
+        ResponseEntity<ActionResponse> duplicateResponse = restTemplate.exchange(
+                "http://localhost:" + port + "/api/auth/register/admin",
+                HttpMethod.POST,
+                jsonRequest(duplicatePayload),
+                ActionResponse.class
+        );
+
+        assertThat(duplicateResponse.getStatusCode().is4xxClientError()).isTrue();
+        assertThat(duplicateResponse.getBody()).isNotNull();
+        assertThat(duplicateResponse.getBody().message()).isEqualTo("An account with this admin ID already exists");
     }
 }

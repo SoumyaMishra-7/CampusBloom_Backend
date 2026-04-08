@@ -10,13 +10,9 @@ public interface AppUserRepository extends JpaRepository<AppUser, Long> {
 
     boolean existsByEmailIgnoreCase(String email);
 
-    boolean existsByRollNumberIgnoreCase(String rollNumber);
+    boolean existsByRoleAndRollNumberIgnoreCase(AppUserRole role, String rollNumber);
 
-    boolean existsByAdminIdIgnoreCase(String adminId);
+    boolean existsByRoleAndAdminIdIgnoreCase(AppUserRole role, String adminId);
 
     Optional<AppUser> findByRoleAndEmailIgnoreCase(AppUserRole role, String email);
-
-    Optional<AppUser> findByRoleAndRollNumberIgnoreCase(AppUserRole role, String rollNumber);
-
-    Optional<AppUser> findByRoleAndAdminIdIgnoreCase(AppUserRole role, String adminId);
 }

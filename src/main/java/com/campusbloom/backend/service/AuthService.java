@@ -17,7 +17,6 @@ import org.springframework.transaction.annotation.Transactional;
 
 import java.time.Instant;
 import java.time.temporal.ChronoUnit;
-import java.util.Optional;
 import java.util.UUID;
 import java.util.concurrent.ThreadLocalRandom;
 
@@ -69,13 +68,11 @@ public class AuthService {
     public AuthResponse login(AuthLoginRequest request) {
         validateCaptcha(request.captchaId(), request.captchaAnswer());
         AppUserRole role = parseRole(request.role());
-        AppUser user = switch (role) {
-            case STUDENT -> findStudentForLogin(request);
-            case ADMIN -> findAdminForLogin(request);
-        };
+        AppUser user = appUserRepository.findByRoleAndEmailIgnoreCase(role, normalize(request.email()))
+                .orElseThrow(() -> new IllegalArgumentException("Invalid email or password"));
 
         if (!passwordEncoder.matches(request.password(), user.getPasswordHash())) {
-            throw new IllegalArgumentException("Invalid email/identifier or password");
+            throw new IllegalArgumentException("Invalid email or password");
         }
 
         String redirectTo = role == AppUserRole.ADMIN ? "/admin-dashboard" : "/student-dashboard";
@@ -162,72 +159,6 @@ public class AuthService {
         };
     }
 
-    private AppUser findStudentForLogin(AuthLoginRequest request) {
-        String email = normalizeNullable(request.email());
-        String rollNumber = normalizeNullable(request.identifier());
-
-        if (email != null && rollNumber != null) {
-            AppUser user = appUserRepository.findByRoleAndEmailIgnoreCase(AppUserRole.STUDENT, email)
-                    .orElseThrow(() -> new IllegalArgumentException("Invalid email/identifier or password"));
-            if (!rollNumber.equals(user.getRollNumber())) {
-                throw new IllegalArgumentException("Invalid email/identifier or password");
-            }
-            return user;
-        }
-
-        if (email != null || rollNumber != null) {
-            return findUserByStudentCredentials(email, rollNumber)
-                    .orElseThrow(() -> new IllegalArgumentException("Invalid email/identifier or password"));
-        }
-
-        throw new IllegalArgumentException("Email or roll number is required for student login");
-    }
-
-    private Optional<AppUser> findUserByStudentCredentials(String email, String rollNumber) {
-        if (email != null) {
-            return appUserRepository.findByRoleAndEmailIgnoreCase(AppUserRole.STUDENT, email);
-        }
-
-        if (rollNumber != null) {
-            return appUserRepository.findByRoleAndRollNumberIgnoreCase(AppUserRole.STUDENT, rollNumber);
-        }
-
-        return Optional.empty();
-    }
-
-    private AppUser findAdminForLogin(AuthLoginRequest request) {
-        String email = normalizeNullable(request.email());
-        String adminId = normalizeNullable(request.identifier());
-
-        if (email != null && adminId != null) {
-            AppUser user = appUserRepository.findByRoleAndEmailIgnoreCase(AppUserRole.ADMIN, email)
-                    .orElseThrow(() -> new IllegalArgumentException("Invalid email/identifier or password"));
-            if (!adminId.equals(user.getAdminId())) {
-                throw new IllegalArgumentException("Invalid email/identifier or password");
-            }
-            return user;
-        }
-
-        if (email != null || adminId != null) {
-            return findUserByAdminCredentials(email, adminId)
-                    .orElseThrow(() -> new IllegalArgumentException("Invalid email/identifier or password"));
-        }
-
-        throw new IllegalArgumentException("Email or admin ID is required for admin login");
-    }
-
-    private Optional<AppUser> findUserByAdminCredentials(String email, String adminId) {
-        if (email != null) {
-            return appUserRepository.findByRoleAndEmailIgnoreCase(AppUserRole.ADMIN, email);
-        }
-
-        if (adminId != null) {
-            return appUserRepository.findByRoleAndAdminIdIgnoreCase(AppUserRole.ADMIN, adminId);
-        }
-
-        return Optional.empty();
-    }
-
     private void ensureEmailAvailable(String email) {
         if (appUserRepository.existsByEmailIgnoreCase(normalize(email))) {
             throw new IllegalArgumentException("An account with this email already exists");
@@ -235,25 +166,18 @@ public class AuthService {
     }
 
     private void ensureRollNumberAvailable(String rollNumber) {
-        if (appUserRepository.existsByRollNumberIgnoreCase(normalize(rollNumber))) {
+        if (appUserRepository.existsByRoleAndRollNumberIgnoreCase(AppUserRole.STUDENT, normalize(rollNumber))) {
             throw new IllegalArgumentException("An account with this roll number already exists");
         }
     }
 
     private void ensureAdminIdAvailable(String adminId) {
-        if (appUserRepository.existsByAdminIdIgnoreCase(normalize(adminId))) {
+        if (appUserRepository.existsByRoleAndAdminIdIgnoreCase(AppUserRole.ADMIN, normalize(adminId))) {
             throw new IllegalArgumentException("An account with this admin ID already exists");
         }
     }
 
     private String normalize(String value) {
         return value.trim().toLowerCase();
-    }
-
-    private String normalizeNullable(String value) {
-        if (value == null || value.isBlank()) {
-            return null;
-        }
-        return normalize(value);
     }
 }
