@@ -5,6 +5,7 @@ import com.campusbloom.backend.model.AdminRegistrationRequest;
 import com.campusbloom.backend.model.AuthLoginRequest;
 import com.campusbloom.backend.model.AuthResponse;
 import com.campusbloom.backend.model.CaptchaChallengeResponse;
+import com.campusbloom.backend.model.DeleteAccountRequest;
 import com.campusbloom.backend.model.StudentRegistrationRequest;
 import com.campusbloom.backend.service.AuthService;
 import jakarta.validation.Valid;
@@ -39,5 +40,10 @@ public class AuthController {
     @PostMapping("/register/admin")
     public ActionResponse registerAdmin(@Valid @RequestBody AdminRegistrationRequest request) {
         return authService.registerAdmin(request);
+    }
+
+    @PostMapping("/delete-account")
+    public ActionResponse deleteAccount(@Valid @RequestBody DeleteAccountRequest request) {
+        return authService.deleteAccount(request);
     }
 }

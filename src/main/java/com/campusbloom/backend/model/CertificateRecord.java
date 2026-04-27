@@ -11,6 +11,8 @@ public record CertificateRecord(
         String status,
         String achievementLink,
         String remarks,
-        String previewKind
+        String previewKind,
+        String fileUrl,
+        String storedFileName
 ) {
 }

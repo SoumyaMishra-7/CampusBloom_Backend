@@ -2,8 +2,10 @@ package com.campusbloom.backend;
 
 import com.campusbloom.backend.model.ActionResponse;
 import com.campusbloom.backend.model.AuthResponse;
+import com.campusbloom.backend.model.CertificateRecord;
 import com.campusbloom.backend.model.CaptchaChallengeResponse;
 import org.junit.jupiter.api.Test;
+import org.springframework.core.io.ByteArrayResource;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.boot.test.web.client.TestRestTemplate;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -13,6 +15,8 @@ import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpMethod;
 import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
+import org.springframework.util.LinkedMultiValueMap;
+import org.springframework.util.MultiValueMap;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
@@ -79,6 +83,44 @@ class BackendApplicationTests {
         assertThat(response.getStatusCode().is2xxSuccessful()).isTrue();
         assertThat(response.getBody()).contains("Soumya Mishra");
         assertThat(response.getBody()).contains("Smart Campus IoT Hackathon Winner");
+    }
+
+    @Test
+    void uploadedCertificateCanBeFetchedForPreview() {
+        HttpHeaders headers = new HttpHeaders();
+        headers.setContentType(MediaType.MULTIPART_FORM_DATA);
+
+        ByteArrayResource fileResource = new ByteArrayResource("%PDF-1.4 preview test".getBytes()) {
+            @Override
+            public String getFilename() {
+                return "preview-test.pdf";
+            }
+        };
+
+        MultiValueMap<String, Object> body = new LinkedMultiValueMap<>();
+        body.add("title", "Preview Test Certificate");
+        body.add("category", "Technical");
+        body.add("description", "Preview should be available");
+        body.add("file", fileResource);
+
+        ResponseEntity<CertificateRecord> uploadResponse = restTemplate.postForEntity(
+                "http://localhost:" + port + "/api/student/certificates/upload",
+                new HttpEntity<>(body, headers),
+                CertificateRecord.class
+        );
+
+        assertThat(uploadResponse.getStatusCode().is2xxSuccessful()).isTrue();
+        assertThat(uploadResponse.getBody()).isNotNull();
+        assertThat(uploadResponse.getBody().fileUrl()).isEqualTo("/api/student/certificates/" + uploadResponse.getBody().id() + "/file");
+
+        ResponseEntity<byte[]> fileResponse = restTemplate.getForEntity(
+                "http://localhost:" + port + uploadResponse.getBody().fileUrl(),
+                byte[].class
+        );
+
+        assertThat(fileResponse.getStatusCode().is2xxSuccessful()).isTrue();
+        assertThat(fileResponse.getHeaders().getContentType()).isNotNull();
+        assertThat(new String(fileResponse.getBody())).contains("%PDF-1.4 preview test");
     }
 
     @Test
@@ -359,5 +401,79 @@ class BackendApplicationTests {
         assertThat(duplicateResponse.getStatusCode().is4xxClientError()).isTrue();
         assertThat(duplicateResponse.getBody()).isNotNull();
         assertThat(duplicateResponse.getBody().message()).isEqualTo("An account with this admin ID already exists");
+    }
+
+    @Test
+    void studentAccountCanBeDeletedFromDatabase() {
+        String registerPayload = """
+                {
+                  "fullName": "Delete Student",
+                  "email": "delete.student@example.com",
+                  "rollNumber": "DEL100",
+                  "department": "Computer Science",
+                  "password": "password123",
+                  "confirmPassword": "password123"
+                }
+                """;
+
+        restTemplate.postForEntity(
+                "http://localhost:" + port + "/api/auth/register/student",
+                jsonRequest(registerPayload),
+                ActionResponse.class
+        );
+
+        String deletePayload = """
+                {
+                  "role": "student",
+                  "email": "delete.student@example.com"
+                }
+                """;
+
+        ResponseEntity<ActionResponse> deleteResponse = restTemplate.postForEntity(
+                "http://localhost:" + port + "/api/auth/delete-account",
+                jsonRequest(deletePayload),
+                ActionResponse.class
+        );
+
+        assertThat(deleteResponse.getStatusCode().is2xxSuccessful()).isTrue();
+        assertThat(deleteResponse.getBody()).isNotNull();
+        assertThat(deleteResponse.getBody().message()).isEqualTo("Student account deleted successfully");
+    }
+
+    @Test
+    void adminAccountCanBeDeletedFromDatabase() {
+        String registerPayload = """
+                {
+                  "fullName": "Delete Admin",
+                  "email": "delete.admin@example.com",
+                  "institutionName": "Campus Bloom University",
+                  "adminId": "DEL-ADMIN-1",
+                  "password": "password123",
+                  "confirmPassword": "password123"
+                }
+                """;
+
+        restTemplate.postForEntity(
+                "http://localhost:" + port + "/api/auth/register/admin",
+                jsonRequest(registerPayload),
+                ActionResponse.class
+        );
+
+        String deletePayload = """
+                {
+                  "role": "admin",
+                  "email": "delete.admin@example.com"
+                }
+                """;
+
+        ResponseEntity<ActionResponse> deleteResponse = restTemplate.postForEntity(
+                "http://localhost:" + port + "/api/auth/delete-account",
+                jsonRequest(deletePayload),
+                ActionResponse.class
+        );
+
+        assertThat(deleteResponse.getStatusCode().is2xxSuccessful()).isTrue();
+        assertThat(deleteResponse.getBody()).isNotNull();
+        assertThat(deleteResponse.getBody().message()).isEqualTo("Admin account deleted successfully");
     }
 }

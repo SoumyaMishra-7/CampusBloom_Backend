@@ -2,7 +2,12 @@ package com.campusbloom.backend.controller;
 
 import com.campusbloom.backend.model.*;
 import com.campusbloom.backend.service.StudentPortalService;
+import org.springframework.core.io.Resource;
+import org.springframework.http.HttpHeaders;
+import org.springframework.http.MediaType;
+import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
+import org.springframework.web.multipart.MultipartFile;
 
 import java.util.List;
 
@@ -42,13 +47,31 @@ public class StudentPortalController {
         return studentPortalService.getCertificates();
     }
 
-    @PostMapping("/certificates/upload")
+    @PostMapping(value = "/certificates/upload", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
     public CertificateRecord uploadCertificate(
-            @RequestParam String fileName,
-            @RequestParam(defaultValue = "image") String fileType,
-            @RequestParam(defaultValue = "1.0") double sizeMB
+            @RequestParam String title,
+            @RequestParam(required = false) String category,
+            @RequestParam(required = false) String description,
+            @RequestParam MultipartFile file
     ) {
-        return studentPortalService.uploadCertificate(fileName, fileType, sizeMB);
+        return studentPortalService.uploadCertificate(title, category, description, file);
+    }
+
+    @PatchMapping("/certificates/{certificateId}/status")
+    public CertificateRecord updateCertificateStatus(
+            @PathVariable Long certificateId,
+            @RequestBody CertificateStatusUpdateRequest request
+    ) {
+        return studentPortalService.updateCertificateStatus(certificateId, request.status(), request.remarks());
+    }
+
+    @GetMapping("/certificates/{certificateId}/file")
+    public ResponseEntity<Resource> getCertificateFile(@PathVariable Long certificateId) {
+        StoredCertificateFile storedFile = studentPortalService.loadCertificateFile(certificateId);
+        return ResponseEntity.ok()
+                .contentType(MediaType.parseMediaType(storedFile.contentType()))
+                .header(HttpHeaders.CONTENT_DISPOSITION, "inline; filename=\"" + storedFile.fileName() + "\"")
+                .body(storedFile.resource());
     }
 
     @GetMapping("/profile/public")

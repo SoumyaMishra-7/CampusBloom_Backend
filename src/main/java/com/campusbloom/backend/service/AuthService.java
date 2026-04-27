@@ -8,6 +8,7 @@ import com.campusbloom.backend.model.AuthLoginRequest;
 import com.campusbloom.backend.model.AuthResponse;
 import com.campusbloom.backend.model.CaptchaChallenge;
 import com.campusbloom.backend.model.CaptchaChallengeResponse;
+import com.campusbloom.backend.model.DeleteAccountRequest;
 import com.campusbloom.backend.model.StudentRegistrationRequest;
 import com.campusbloom.backend.repository.AppUserRepository;
 import com.campusbloom.backend.repository.CaptchaChallengeRepository;
@@ -114,6 +115,17 @@ public class AuthService {
         appUserRepository.save(user);
 
         return new ActionResponse("Admin account created successfully");
+    }
+
+    @Transactional
+    public ActionResponse deleteAccount(DeleteAccountRequest request) {
+        AppUserRole role = parseRole(request.role());
+        AppUser user = appUserRepository.findByRoleAndEmailIgnoreCase(role, normalize(request.email()))
+                .orElseThrow(() -> new IllegalArgumentException("Account not found"));
+
+        appUserRepository.delete(user);
+        String accountType = role == AppUserRole.ADMIN ? "Admin" : "Student";
+        return new ActionResponse(accountType + " account deleted successfully");
     }
 
     private void validatePasswords(String password, String confirmPassword) {
