@@ -90,6 +90,13 @@ class BackendApplicationTests {
     }
 
     @Test
+    void apiDashboardEndpointReturnsStudentData() {
+        ResponseEntity<String> response = restTemplate.getForEntity("http://localhost:" + port + "/api/dashboard", String.class);
+        assertThat(response.getStatusCode().is2xxSuccessful()).isTrue();
+        assertThat(response.getBody()).contains("Soumya Mishra");
+    }
+
+    @Test
     void dashboardEndpointReturnsStudentData() {
         ResponseEntity<String> response = restTemplate.getForEntity("http://localhost:" + port + "/api/student/dashboard", String.class);
         assertThat(response.getStatusCode().is2xxSuccessful()).isTrue();
@@ -171,6 +178,73 @@ class BackendApplicationTests {
 
         ResponseEntity<AuthResponse> loginResponse = restTemplate.postForEntity(
                 "http://localhost:" + port + "/api/auth/login",
+                jsonRequest(loginPayload),
+                AuthResponse.class
+        );
+
+        assertThat(loginResponse.getStatusCode().is2xxSuccessful()).isTrue();
+        assertThat(loginResponse.getBody()).isNotNull();
+        assertThat(loginResponse.getBody().role()).isEqualTo("student");
+        assertThat(loginResponse.getBody().redirectTo()).isEqualTo("/student-dashboard");
+    }
+
+    @Test
+    void studentCanSignupThroughCompatibilityEndpoint() {
+        String signupPayload = """
+                {
+                  "role": "student",
+                  "fullName": "Compatibility Student",
+                  "email": "compat.student@example.com",
+                  "rollNumber": "COMP101",
+                  "department": "Computer Science",
+                  "password": "password123",
+                  "confirmPassword": "password123"
+                }
+                """;
+
+        ResponseEntity<ActionResponse> signupResponse = restTemplate.postForEntity(
+                "http://localhost:" + port + "/api/signup",
+                jsonRequest(signupPayload),
+                ActionResponse.class
+        );
+
+        assertThat(signupResponse.getStatusCode().is2xxSuccessful()).isTrue();
+        assertThat(signupResponse.getBody()).isNotNull();
+        assertThat(signupResponse.getBody().message()).isEqualTo("Student account created successfully");
+    }
+
+    @Test
+    void studentCanLoginThroughCompatibilityEndpoint() {
+        String registerPayload = """
+                {
+                  "fullName": "Compatibility Login Student",
+                  "email": "compat.login@example.com",
+                  "rollNumber": "COMP102",
+                  "department": "Computer Science",
+                  "password": "password123",
+                  "confirmPassword": "password123"
+                }
+                """;
+
+        restTemplate.postForEntity(
+                "http://localhost:" + port + "/api/auth/register/student",
+                jsonRequest(registerPayload),
+                ActionResponse.class
+        );
+
+        CaptchaChallengeResponse captcha = fetchCaptcha();
+        String loginPayload = """
+                {
+                  "role": "student",
+                  "email": "compat.login@example.com",
+                  "captchaId": "%s",
+                  "captchaAnswer": "%s",
+                  "password": "password123"
+                }
+                """.formatted(captcha.captchaId(), solveCaptcha(captcha.prompt()));
+
+        ResponseEntity<AuthResponse> loginResponse = restTemplate.postForEntity(
+                "http://localhost:" + port + "/api/login",
                 jsonRequest(loginPayload),
                 AuthResponse.class
         );
