@@ -17,6 +17,7 @@ import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.util.LinkedMultiValueMap;
 import org.springframework.util.MultiValueMap;
+import java.net.URI;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
@@ -130,10 +131,11 @@ class BackendApplicationTests {
 
         assertThat(uploadResponse.getStatusCode().is2xxSuccessful()).isTrue();
         assertThat(uploadResponse.getBody()).isNotNull();
-        assertThat(uploadResponse.getBody().fileUrl()).isEqualTo("/api/student/certificates/" + uploadResponse.getBody().id() + "/file");
+        assertThat(uploadResponse.getBody().fileUrl()).startsWith("http://localhost:" + port + "/uploads/");
+        assertThat(uploadResponse.getBody().storedFileName()).contains("uploads");
 
         ResponseEntity<byte[]> fileResponse = restTemplate.getForEntity(
-                "http://localhost:" + port + uploadResponse.getBody().fileUrl(),
+                URI.create(uploadResponse.getBody().fileUrl()),
                 byte[].class
         );
 

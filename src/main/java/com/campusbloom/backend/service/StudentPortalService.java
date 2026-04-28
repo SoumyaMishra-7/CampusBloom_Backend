@@ -7,6 +7,7 @@ import org.springframework.core.io.UrlResource;
 import org.springframework.stereotype.Service;
 import org.springframework.util.StringUtils;
 import org.springframework.web.multipart.MultipartFile;
+import org.springframework.web.servlet.support.ServletUriComponentsBuilder;
 
 import java.io.IOException;
 import java.net.URLEncoder;
@@ -27,9 +28,11 @@ import java.util.concurrent.atomic.AtomicLong;
 @Service
 public class StudentPortalService {
     private static final DateTimeFormatter TIMESTAMP_FORMATTER = DateTimeFormatter.ISO_LOCAL_DATE_TIME;
+    private static final String UPLOADS_URL_PREFIX = "/uploads";
 
     private final AtomicLong certificateIdSequence = new AtomicLong(100);
     private final Path uploadDirectory;
+    private final String uploadDirectorySegment;
 
     private StudentProfileSettings profile = new StudentProfileSettings(
             "Soumya Mishra",
@@ -88,6 +91,9 @@ public class StudentPortalService {
     public StudentPortalService(@Value("${app.certificates.upload-dir:uploads/certificates}") String uploadDir) {
         try {
             this.uploadDirectory = Path.of(uploadDir).toAbsolutePath().normalize();
+            this.uploadDirectorySegment = this.uploadDirectory.getFileName() == null
+                    ? ""
+                    : this.uploadDirectory.getFileName().toString().replace("\\", "/");
             Files.createDirectories(this.uploadDirectory);
         } catch (IOException exception) {
             throw new IllegalStateException("Could not initialize certificate upload storage", exception);
@@ -176,6 +182,7 @@ public class StudentPortalService {
         String normalizedType = resolveFileType(file);
         String previewKind = normalizedType.equals("PDF") ? "pdf" : "image";
         String storedFileName = storeCertificateFile(nextId, file, normalizedType);
+        Path storedFilePath = uploadDirectory.resolve(storedFileName).normalize();
         String uploadedAt = LocalDateTime.now().format(TIMESTAMP_FORMATTER);
 
         CertificateRecord record = new CertificateRecord(
@@ -190,8 +197,8 @@ public class StudentPortalService {
                 "/student-achievements",
                 StringUtils.hasText(description) ? description.trim() : "Awaiting admin review and verification remarks.",
                 previewKind,
-                buildFileUrl(nextId),
-                storedFileName
+                buildFileUrl(storedFileName),
+                storedFilePath.toString()
         );
         certificates.add(0, record);
         return record;
@@ -230,7 +237,7 @@ public class StudentPortalService {
         if (!StringUtils.hasText(record.storedFileName())) {
             throw new IllegalArgumentException("Certificate file not found");
         }
-        Path filePath = uploadDirectory.resolve(record.storedFileName()).normalize();
+        Path filePath = Path.of(record.storedFileName()).toAbsolutePath().normalize();
         if (!Files.exists(filePath)) {
             throw new IllegalArgumentException("Certificate file not found");
         }
@@ -403,8 +410,15 @@ public class StudentPortalService {
         return Math.round(sizeMb * 100.0) / 100.0;
     }
 
-    private String buildFileUrl(Long certificateId) {
-        return "/api/student/certificates/" + certificateId + "/file";
+    private String buildFileUrl(String storedFileName) {
+        String relativePath = UPLOADS_URL_PREFIX + "/" + uploadDirectorySegment + "/" + storedFileName;
+        try {
+            return ServletUriComponentsBuilder.fromCurrentContextPath()
+                    .path(relativePath)
+                    .toUriString();
+        } catch (IllegalStateException exception) {
+            return relativePath;
+        }
     }
 
     private String resolveContentType(String type) {
