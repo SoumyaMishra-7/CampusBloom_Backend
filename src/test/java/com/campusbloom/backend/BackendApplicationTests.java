@@ -74,7 +74,19 @@ class BackendApplicationTests {
     @Test
     void testEndpointReturnsExpectedMessage() {
         ResponseEntity<String> response = restTemplate.getForEntity("http://localhost:" + port + "/test", String.class);
-        assertThat(response.getBody()).isEqualTo("Backend working");
+        assertThat(response.getBody()).isEqualTo("Backend working!");
+    }
+
+    @Test
+    void apiTestEndpointReturnsExpectedMessage() {
+        ResponseEntity<String> response = restTemplate.getForEntity("http://localhost:" + port + "/api/test", String.class);
+        assertThat(response.getBody()).isEqualTo("Backend working!");
+    }
+
+    @Test
+    void rootEndpointReturnsAppRunningMessage() {
+        ResponseEntity<String> response = restTemplate.getForEntity("http://localhost:" + port + "/", String.class);
+        assertThat(response.getBody()).isEqualTo("App running");
     }
 
     @Test

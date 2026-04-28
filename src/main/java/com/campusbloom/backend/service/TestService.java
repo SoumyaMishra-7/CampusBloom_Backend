@@ -7,6 +7,6 @@ import org.springframework.stereotype.Service;
 public class TestService {
 
     public TestMessage getTestMessage() {
-        return new TestMessage("Backend working");
+        return new TestMessage("Backend working!");
     }
 }

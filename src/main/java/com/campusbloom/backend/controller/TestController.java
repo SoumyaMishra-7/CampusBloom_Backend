@@ -13,7 +13,7 @@ public class TestController {
         this.testService = testService;
     }
 
-    @GetMapping("/test")
+    @GetMapping({"/test", "/api/test"})
     public String test() {
         return testService.getTestMessage().message();
     }
